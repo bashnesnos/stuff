@@ -19,12 +19,11 @@ def names = ['Confucius'
     , 'Diogenes'
 ]
 
-def stickCount = 5
 def sticks = (0..4).collect {
     new Chopstick()
 }
 
-def threadsInCriticalSection = new java.util.concurrent.atomic.AtomicInteger(0)
+def threadsInCriticalSection = new java.util.concurrent.CopyOnWriteArrayList<String>()
 def waitCountSamples = new java.util.concurrent.CopyOnWriteArrayList<Integer>()
 def waitingThreadsSamples = new java.util.concurrent.CopyOnWriteArrayList<Integer>()
 def waitingThreads = new java.util.concurrent.atomic.AtomicInteger(0)
@@ -32,11 +31,12 @@ def iterationsToThreadMap = [:]
 def waitToThreadMap = [:]
 
 def threads = (0..4).collect { i ->
-    final left = sticks[i]
-    final right = sticks[i == 4 ? 0 : i + 1]
+    final Chopstick left = sticks[i]
+    final Chopstick right = sticks[i == 4 ? 0 : i + 1]
     iterationsToThreadMap[names[i]] = new java.util.concurrent.atomic.AtomicInteger(0) 
     waitToThreadMap[names[i]] = new java.util.concurrent.atomic.AtomicInteger(0) 
     Thread.startDaemon(names[i]) {
+        def random = new Random()
         def myName = Thread.currentThread().getName()
         println "$left <-- ${String.format('%-10s', myName)} --> $right"
         def iterations = iterationsToThreadMap[myName]
@@ -50,38 +50,41 @@ def threads = (0..4).collect { i ->
                 waitCount++
                 waitOverWork.incrementAndGet()                
                 if (left.occupied == null && (left.occupied = myName) == myName) {
-                    int doublecheck = 2                
-                    while (!Thread.currentThread().isInterrupted() && left.occupied == myName) {
+                    int doublecheck = 10                
+                    int tries = Math.abs(random.nextInt(1000))
+                    while (!Thread.currentThread().isInterrupted() && tries-- > 0 && left.occupied == myName) {
                         if (doublecheck-- > 0) {
                             continue
                         }
                         else if (left.occupied == myName && right.occupied == null && (right.occupied = myName) == myName) {
-                            doublecheck = 2
-                            while (!Thread.currentThread().isInterrupted() && right.occupied == myName && doublecheck-- > 0) {
+                            doublecheck = 10
+                            while (!Thread.currentThread().isInterrupted() && left.occupied == myName && right.occupied == myName && doublecheck-- > 0) {
                                 ; //spin
                             }
 
                             if (left.occupied == myName && right.occupied == myName) {
-                                int criticalSectionCheck = threadsInCriticalSection.incrementAndGet()
-                                if (criticalSectionCheck > stickCount/2) { //depends on number of sticks
-                                    threadsInCriticalSection.decrementAndGet()
+                                if (threadsInCriticalSection.size() > 1) { //depends on number of sticks
                                     sticks.each {
                                         println "$it : $it.occupied"
                                     }
                                     println "_______________"
-                                    throw new IllegalStateException("$myName; $left: ${left.occupied}; $right: ${right.occupied}; too many eaters: " + criticalSectionCheck)
+                                    throw new IllegalStateException("$myName; $left: ${left.occupied}; $right: ${right.occupied}; too many eaters: $threadsInCriticalSection")
                                 }
+                                threadsInCriticalSection.add(myName)
                                 //println "$myName eating"
                                 waitCountSamples.add(waitCount)
                                 waitingThreadsSamples.add(waitingThreads.decrementAndGet())
                                 waitOverWork.decrementAndGet()
                                 waitCount = 0
-                                threadsInCriticalSection.decrementAndGet()
+                                threadsInCriticalSection.remove(myName)
                                 right.occupied = null
                                 left.occupied = null
                                 Thread.sleep(1) //digestion; comment this line to see some starved philosophers
                             }
                         }
+                    }
+                    if (tries == 0 || left.occupied == myName) {
+                        left.occupied = null
                     }
                 }
             }

@@ -19,7 +19,6 @@ def names = ['Confucius'
     , 'Diogenes'
 ]
 
-def stickCount = 5
 def sticks = (0..4).collect {
     new Chopstick()
 }
@@ -54,11 +53,10 @@ def threads = (0..4).collect { i ->
                     if (left.occupied == myName && right.occupied == null) {
                         right.occupied = myName
                         if (right.occupied == myName) {
-                            int criticalSectionCheck = threadsInCriticalSection.incrementAndGet()
-                            if (criticalSectionCheck > stickCount/2) { //depends on number of sticks
-                                threadsInCriticalSection.decrementAndGet()
-                                throw new IllegalStateException("$myName; $left: ${left.occupied}; $right: ${right.occupied}; too many eaters: " + criticalSectionCheck)
+                            if (threadsInCriticalSection.get() > 1) { //depends on number of sticks
+                                throw new IllegalStateException("$myName; $left: ${left.occupied}; $right: ${right.occupied}; too many eaters: " + threadsInCriticalSection.get())
                             }
+                            threadsInCriticalSection.incrementAndGet()
                             //println "$myName eating"
                             waitCountSamples.add(waitCount)
                             waitingThreadsSamples.add(waitingThreads.decrementAndGet())
