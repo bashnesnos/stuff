@@ -55,7 +55,7 @@ def threads = (0..4).collect { i ->
                 synchronized(left) {
                     left.wait(oddiness) //#wait1 is slower than a variation with #digestion only; but it is deadlock-free
                     synchronized(right) {
-                        //right.wait(1) //#wait2 uncomment this with #wait1 to see 5-thread deadlock
+                        //right.wait(1) //#wait2 uncomment this with #wait1 set to 1 (literally) to see 5-thread deadlock
                         //println "$myName eating"
                         if (threadsInCriticalSection.get() > 1) { //depends on number of sticks
                             throw new IllegalStateException("Too many eaters: " + threadsInCriticalSection.get())
