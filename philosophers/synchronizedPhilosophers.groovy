@@ -34,6 +34,7 @@ def threads = (0..4).collect { i ->
     final left = sticks[i]
     final right = sticks[i == 4 ? 0 : i + 1]
     //println "$i: $left $right"
+    final int oddiness = i % 2 == 0 ? (i == 0 ? 3 : 1 ) : 2
     iterationsToThreadMap[names[i]] = new java.util.concurrent.atomic.AtomicInteger(0) 
     waitToThreadMap[names[i]] = new java.util.concurrent.atomic.AtomicInteger(0) 
     Thread.startDaemon(names[i]) {
@@ -52,7 +53,9 @@ def threads = (0..4).collect { i ->
                 waitCount++
                 waitOverWork.incrementAndGet()
                 synchronized(left) {
+                    left.wait(oddiness) //#wait1 is slower than a variation with #digestion only; but it is deadlock-free
                     synchronized(right) {
+                        //right.wait(1) //#wait2 uncomment this with #wait1 to see 5-thread deadlock
                         //println "$myName eating"
                         if (threadsInCriticalSection.get() > 1) { //depends on number of sticks
                             throw new IllegalStateException("Too many eaters: " + threadsInCriticalSection.get())
@@ -65,7 +68,7 @@ def threads = (0..4).collect { i ->
                         threadsInCriticalSection.decrementAndGet()
                     }
                 }
-                Thread.sleep(1) //digestion; comment this line to see some starved philosophers
+                //Thread.sleep(1) //#digestion; fastest but deadlock is theoretically possible if threads are started simultaneous enough; #wait1 + #digestion gives a middle speed; comment both #wait1 and this line to see some starved philosophers
             }
         }
         catch (InterruptedException ie) {
