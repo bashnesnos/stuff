@@ -68,7 +68,7 @@ def threads = (0..4).collect { i ->
                             Thread.sleep(1) //digestion; comment this line to see some starved philosophers
                         }
                         else if (left.occupied == myName) {
-                            left.occupied = null //can't grab right - release left; that's where we get livelock
+                            left.occupied = null //can't grab right and left in one go - release both; that's where we get livelock
                         }
                     }
                 }

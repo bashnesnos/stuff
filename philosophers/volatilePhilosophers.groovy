@@ -10,6 +10,29 @@ class Chopstick {
     public String toString() {
         "Chopstick #$idx"
     }
+    
+    public boolean lock(Object holder) {
+        if (occupied == null) {
+            occupied = holder
+            //return occupied == holder
+// data race check for simultaneous grabs
+            int check = 2 //2 threads at the same time might be fighting for a stick
+            while (occupied == holder && check > 0) {
+                check--;
+            }
+            return check == 0 && occupied == holder
+
+        }
+        else {
+            return false
+        }
+    }
+    
+    public void unlock(Object holder) {
+        if (occupied == holder) {
+            occupied = null
+        }
+    }
 }
 
 def names = ['Confucius'
@@ -49,44 +72,32 @@ def threads = (0..4).collect { i ->
                 waitingThreadsSamples.add(waitingThreads.incrementAndGet())
                 waitCount++
                 waitOverWork.incrementAndGet()                
-                if (left.occupied == null && (left.occupied = myName) == myName) {
-                    int doublecheck = 10                
-                    int tries = Math.abs(random.nextInt(1000))
-                    while (!Thread.currentThread().isInterrupted() && tries-- > 0 && left.occupied == myName) {
-                        if (doublecheck-- > 0) {
-                            continue
-                        }
-                        else if (left.occupied == myName && right.occupied == null && (right.occupied = myName) == myName) {
-                            doublecheck = 10
-                            while (!Thread.currentThread().isInterrupted() && left.occupied == myName && right.occupied == myName && doublecheck-- > 0) {
-                                ; //spin
-                            }
-
-                            if (left.occupied == myName && right.occupied == myName) {
-                                if (threadsInCriticalSection.size() > 1) { //depends on number of sticks
-                                    sticks.each {
-                                        println "$it : $it.occupied"
-                                    }
-                                    println "_______________"
-                                    throw new IllegalStateException("$myName; $left: ${left.occupied}; $right: ${right.occupied}; too many eaters: $threadsInCriticalSection")
+                if (left.lock(myName)) {
+                    int tries = Math.abs(random.nextInt(10))
+                    while (!Thread.currentThread().isInterrupted() && tries-- > 0) {
+                        if (right.lock(myName)) {
+                            if (threadsInCriticalSection.size() > 1) { //depends on number of sticks
+                                sticks.each {
+                                    println "$it : $it.occupied"
                                 }
-                                threadsInCriticalSection.add(myName)
-                                //println "$myName eating"
-                                waitCountSamples.add(waitCount)
-                                waitingThreadsSamples.add(waitingThreads.decrementAndGet())
-                                waitOverWork.decrementAndGet()
-                                waitCount = 0
-                                threadsInCriticalSection.remove(myName)
-                                right.occupied = null
-                                left.occupied = null
-                                Thread.sleep(1) //digestion; comment this line to see some starved philosophers
+                                println "_______________"
+                                throw new IllegalStateException("$myName; $left: ${left.occupied}; $right: ${right.occupied}; too many eaters: $threadsInCriticalSection")
                             }
+                            threadsInCriticalSection.add(myName)
+                            Thread.sleep(Math.abs(random.nextInt(10))) //eating simulation to balance sequintial start
+                            //println "$myName eating"
+                            waitCountSamples.add(waitCount)
+                            waitingThreadsSamples.add(waitingThreads.decrementAndGet())
+                            waitOverWork.decrementAndGet()
+                            waitCount = 0
+                            threadsInCriticalSection.remove(myName)
+                            right.unlock(myName)
+                            left.unlock(myName)
+                            break;
                         }
-                    }
-                    if (tries == 0 || left.occupied == myName) {
-                        left.occupied = null
                     }
                 }
+                left.unlock(myName)
             }
         }
         catch (InterruptedException ie) {

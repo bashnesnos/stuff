@@ -58,14 +58,19 @@ def threads = (0..4).collect { i ->
                         //right.wait(1) //#wait2 uncomment this with #wait1 set to 1 (literally) to see 5-thread deadlock
                         //println "$myName eating"
                         if (threadsInCriticalSection.get() > 1) { //depends on number of sticks
-                            throw new IllegalStateException("Too many eaters: " + threadsInCriticalSection.get())
+                            throw new IllegalStateException("$myName; too many eaters: " + threadsInCriticalSection.get())
                         }
                         threadsInCriticalSection.incrementAndGet()
-                        waitCountSamples.add(waitCount)
-                        waitingThreadsSamples.add(waitingThreads.decrementAndGet())
-                        waitOverWork.decrementAndGet()
-                        waitCount = 0
-                        threadsInCriticalSection.decrementAndGet()
+                        try {
+                            Thread.sleep(Math.abs(random.nextInt(10))) //simulating eating
+                        }
+                        finally {
+                            waitCountSamples.add(waitCount)
+                            waitingThreadsSamples.add(waitingThreads.decrementAndGet())
+                            waitOverWork.decrementAndGet()
+                            waitCount = 0
+                            threadsInCriticalSection.decrementAndGet()
+                        }
                     }
                 }
                 //Thread.sleep(1) //#digestion; fastest but deadlock is theoretically possible if threads are started simultaneous enough; #wait1 + #digestion gives a middle speed; comment both #wait1 and this line to see some starved philosophers
