@@ -84,16 +84,20 @@ def threads = (0..4).collect { i ->
                                 throw new IllegalStateException("$myName; $left: ${left.occupied}; $right: ${right.occupied}; too many eaters: $threadsInCriticalSection")
                             }
                             threadsInCriticalSection.add(myName)
-                            Thread.sleep(Math.abs(random.nextInt(10))) //eating simulation to balance sequintial start
-                            //println "$myName eating"
-                            waitCountSamples.add(waitCount)
-                            waitingThreadsSamples.add(waitingThreads.decrementAndGet())
-                            waitOverWork.decrementAndGet()
-                            waitCount = 0
-                            threadsInCriticalSection.remove(myName)
-                            right.unlock(myName)
-                            left.unlock(myName)
-                            break;
+                            try {
+                                Thread.sleep(Math.abs(random.nextInt(10))) //eating simulation to balance sequintial start
+                                //println "$myName eating"
+                            }
+                            finally {
+                                waitCountSamples.add(waitCount)
+                                waitingThreadsSamples.add(waitingThreads.decrementAndGet())
+                                waitOverWork.decrementAndGet()
+                                waitCount = 0
+                                threadsInCriticalSection.remove(myName)
+                                right.unlock(myName)
+                                left.unlock(myName)
+                                break;
+                            }
                         }
                     }
                 }
@@ -115,7 +119,7 @@ def threads = (0..4).collect { i ->
     }
 }
 
-Thread.sleep(30000)
+Thread.sleep(5000)
 threads.each {
     it.interrupt()
 }
