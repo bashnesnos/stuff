@@ -157,7 +157,7 @@ class InterruptibleDownloader implements Callable<Boolean> {
 						pauseCondition.await();
 					}
 					
-					byte[] buffer = new byte[available > 8096 ? 8096 : available];
+					byte[] buffer = new byte[available > 8192 ? 8192 : available];
 					is.read(buffer);
 					os.write(buffer);
 					os.flush();
