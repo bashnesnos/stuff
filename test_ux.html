@@ -1,0 +1,229 @@
+<!DOCTYPE html PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<HTML>
+   <HEAD>
+      <TITLE>Apdex вживую</TITLE>
+   </HEAD>
+<BODY>
+   <div align="left">
+   		<H1>Привет!</H1>
+   		<P>Данный тест представляет собой наглядную демонстрацию четырёх различных классов Apdex. Цель тестирования - определить наиболее удовлетворяющий класс Apdex для современных пользователей интернета. В тесте представлены Apdex с целевыми значениями 20, 10, 5 и 2,5 секунд. Время прохождения теста варьируется от одной до трёх минут. Схема прохождения теста:
+   		 <ol>
+   		 <li>Нажать кнопку "Начать тест", после этого случайным образом сгенерируется время ожидания и начнётся отсчёт в соответствии с одним из четырёх представленных классов Apdex. Так же будут отображены кнопки "Идёт тестирование" и "Нет сил ждать"</li>
+   		 <li>По истечении времени ожидания кнопки "Идёт тестирование" и "Нет сил ждать" заменяются кнопкой "Следующий", по нажатию на которую генерируется время ожидания и начинается отсчёт в соответствии со следующим из оставшихся классов</li>
+   		 <li>Если по Вашим ощущениям время ожидания превысило приемлемые для Вас границы, Вы можете нажать кнопку "Нет сил ждать" для завершения демонстрации текущего класса и перехода к пункту 2</li>
+   		 <li>После демонстрации всех классов появится кнопка "Завершить тест", по нажатию на которую окно со страницей будет закрыто</li>
+   		 </ol>
+   		 Т.о. каждый из представленных классов Apdex будет продемонстрирован только один раз в случайном порядке. Перед каждым нажатием на кнопку "Следующий" рекомендуется 10 секунд отдохнуть для восстановления концентрации. Результаты будут опубликованы после того как наберётся не менее 1000 просмотров на каждый класс Apdex. Спасибо за внимание и участие!</P> 
+   	<div align="center" style="margin-top: 10%">
+		<input type="button" value="Начать тест" style="width:200px" id="test_button" />
+		<br/>
+		<br/>
+		<input type="button" style="visibility: hidden;width:200px" value="Нет сил ждать" id="stop_button" />
+   </div>
+
+   <script type="text/javascript">
+
+   
+   	(function() {
+		   	var View = function() {
+
+		   		var INIT_ANIMATION_COUNT = 10;
+		   		var animationCount = INIT_ANIMATION_COUNT;
+		   		var animationControl = null;
+		   		var view_obj = this;
+
+		   		var stopButton = document.getElementById('stop_button');
+		   		var testButton = document.getElementById('test_button');
+
+		   		this.stopAnimation = function() {
+		   			if (animationControl != null) {
+		   				clearInterval(animationControl);
+		   				animationCount = INIT_ANIMATION_COUNT;
+		   			}
+		   		}
+
+			   	this.hideStopButton = function() {
+			   		stopButton.style.visibility='hidden';
+			   	}
+		   
+			 	this.showStopButton = function() {
+					stopButton.style.visibility='visible';
+				}
+
+		   		this.renderNext = function(nextHandler) {
+		   			view_obj.hideStopButton();
+		   			testButton.value = 'Следующий';
+		   			testButton.onclick = nextHandler;
+		   		}
+
+		   		this.renderStart = function(startHandler) {
+		   			testButton.onclick = startHandler;
+		   		}
+
+		   		this.renderFinish = function() {
+		   			view_obj.hideStopButton();
+		   			testButton.value = 'Завершить тест';
+		   			testButton.onclick = function(){window.close();};
+		   		}
+
+	   			var animateButton = function() {
+	   				if (animationCount-- > 0) {
+	   					testButton.value = testButton.value + '.';
+	   				} else {
+	   					animationCount = INIT_ANIMATION_COUNT;
+	   					testButton.value = 'Идёт тестирование';
+	   				}
+	   			}
+
+		   		this.animateTest = function(stopHandler) {
+		   			testButton.value = 'Идёт тестирование';
+		   			testButton.onclick = null;
+		   			stopButton.onclick = function() {
+		   				view_obj.stopAnimation();
+		   				stopHandler();
+		   			};
+		   			view_obj.showStopButton();
+		   			animationControl = setInterval(animateButton, 200);
+		   		}
+
+		    
+		    }
+
+			var DurationKlass = function(name, from, to, goodFactor, goodPercentile) {
+				var name = name;
+
+				this.getName = function() {
+					return name;
+				}
+
+				this.getDuration = function(){ 
+					var randm = function(min, max) {
+						return Math.random() * (max - min) + min;
+					};
+
+					if (Math.random() < goodPercentile) {
+						return randm(from * goodFactor, from) * 1000;
+					} else {
+						return randm(from, to) * 1000;
+					}
+				};
+			}
+
+			var GoodApdexKlass = function(target) {
+				return new DurationKlass('apdex'+target, target, target*4, 0.65, 0.75);
+			}
+
+			var TestUX = function(durationKlass, onstop) {
+				var start = null;
+				var duration = durationKlass.getDuration();
+				var finish = 0;
+				var finished = false;
+				var scheduledStop = null;
+				durationKlass = durationKlass.getName();
+
+				this.start = function(){
+					if (!finished) {
+						start = new Date();
+						scheduledStop = setTimeout(function() { 
+							if (!finished) {
+								finished = true;
+								finish = new Date();
+								onstop(duration, durationKlass, true);
+							}
+						}, duration);
+					}
+				}
+
+				this.forceStop = function(){
+					if (!finished) {
+						finished = true;
+						finish = new Date();
+						clearTimeout(scheduledStop);
+						onstop(finish - start, durationKlass, false);
+					}
+				}
+
+
+				this.getFinish = function(){
+					return finish;
+				}
+			}
+
+			var APDEX20 = new GoodApdexKlass(20);
+			var APDEX10 = new GoodApdexKlass(10);
+			var APDEX5 = new GoodApdexKlass(5);
+			var APDEX2_5 = new GoodApdexKlass(2.5);
+
+
+			var Control = function() {
+				var curnt_test = null;
+				var view = new View();
+
+				var getNextTest = (function(klasses) {
+					return function() {
+						var randmInt = function(min, max) {
+							return Math.floor(Math.random() * (max - min + 1)) + min;
+						};
+
+						if (klasses.length > 0) {
+							var nextIdx = randmInt(0, klasses.length - 1);
+							var nextKlass = klasses[nextIdx];
+							klasses.splice(nextIdx,1);
+							return new TestUX(nextKlass, onStop);
+						} else {
+							return null;
+						}
+					}
+				})([APDEX20, APDEX10, APDEX5, APDEX2_5])
+
+				var callbackOnStop = function() {
+					view.stopAnimation();
+					view.renderNext(function() {
+						curnt_test = getNextTest();
+						if (curnt_test != null) {
+							curnt_test.start();
+							view.animateTest(curnt_test.forceStop);
+						} else {
+							view.renderFinish();
+						}
+					});
+				};
+
+				var onStop = function(elapsed, klass, succeeded) {
+
+					var body = "";
+
+					if (succeeded) {
+						body = 'test_result,klass='+klass+',result=1 elapsed='+elapsed;
+					} else {
+						body = 'test_result,klass='+klass+',result=0 elapsed='+elapsed;
+					}
+
+					var xhttp = new XMLHttpRequest();
+					 xhttp.onreadystatechange = function() {
+			    		if (this.readyState == 4 && this.status >= 400) {
+			        		throw "Failed to send stat";
+			   			}
+					};
+
+					xhttp.open("POST", "http://localhost:8086/write?db=mydb&precision=ms", true);
+					xhttp.send(body); 
+
+					callbackOnStop();
+				};
+
+
+				view.renderStart(function() {
+					curnt_test = getNextTest();
+					curnt_test.start();
+					view.animateTest(curnt_test.forceStop);
+				});
+
+			}
+
+			var control = new Control();
+		})();	
+
+   </script>
+</BODY>
+</HTML>

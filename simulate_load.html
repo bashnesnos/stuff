@@ -1,0 +1,145 @@
+<!DOCTYPE html PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<HTML>
+   <HEAD>
+      <TITLE>
+         Load simulator
+      </TITLE>
+   </HEAD>
+<BODY>
+   <H1>Hi</H1>
+   <P>This is a session load simulator</P> 
+
+   <script type="text/javascript">
+
+   	function getRandomInt(min, max) {
+ 		return Math.floor(Math.random() * (max - min)) + min;
+	}
+
+   	var Page = function(initName, initNetBounds, initDomBounds, initRenderBounds) {
+   		var name = initName;
+	    var netBounds = initNetBounds != null ? initNetBounds : [200, 2000];
+	    var domBounds = initDomBounds != null ? initDomBounds : [2000, 5000];
+	    var renderBounds = initRenderBounds != null ? initRenderBounds : [4000, 6000];
+
+		this.getName = function() {
+			return name;
+		}
+
+	   	this.getRandomNet = function() {
+	 		return getRandomInt(netBounds[0], netBounds[1]);
+		}
+		
+		this.getRandomDom = function() {
+	 	 	return getRandomInt(domBounds[0], domBounds[1]);
+		}
+
+		this.getRandomLoad = function() {
+	 	 	return getRandomInt(renderBounds[0], renderBounds[1]);
+		}
+
+		this.setNetBounds = function(bounds) {
+			netBounds = bounds;
+		}
+
+		this.setDomBounds = function(bounds) {
+			domBounds = bounds;
+		}
+
+		this.setRenderBounds = function(bounds) {
+			renderBounds = bounds;
+		}
+	}
+
+	var PAGE_TYPES = [];
+	PAGE_TYPES['main'] = new Page('main');
+	PAGE_TYPES['catalog'] = new Page('catalog');
+	PAGE_TYPES['product'] = new Page('product');
+	PAGE_TYPES['search'] = new Page('search', [200, 400], [3000,4000], [2000,6000]);
+	PAGE_TYPES['cart'] = new Page('cart', [200, 400], [1000,3000], [2000,5000]);
+	PAGE_TYPES['checkout'] = new Page('checkout', [200, 400], [1000,3000], [2000,5000]);
+	PAGE_TYPES['reg'] = new Page('reg', [200, 400], [1000,3000], [2000,3000]);
+	PAGE_TYPES['auth'] = new Page('auth', [200, 400], [1000,3000], [2000,3000]);
+
+    //$.post("http://localhost:8086/query", "q=CREATE DATABASE mydb");
+    
+    (function() {
+    		var influxURL = "http://localhost:8086/write?db=mydb&precision=ms";
+    		var pageTypes = ['cart','checkout'];
+    		var totalTypes = pageTypes.length - 1;
+
+    		var postSessionLoad = function(name, net, dom, load) {
+				var xhttp = new XMLHttpRequest();
+	    		xhttp.onreadystatechange = function() {
+	        		if (this.readyState == 4 && this.status >= 400) {
+	            		throw "Failed to send stat";
+	       			}
+	    		};
+    			xhttp.open("POST", influxURL, true);
+	    		xhttp.send('session_load,page=' + name + ',abandoned=0 total=' + (net + dom + load) + ',net=' + net + ',dom=' + dom +',load=' + load);
+    		}
+
+    		var postAbandoned = function(name, abandonedTime, net, dom, load) {
+				var xhttp = new XMLHttpRequest();
+	    		xhttp.onreadystatechange = function() {
+	        		if (this.readyState == 4 && this.status >= 400) {
+	            		throw "Failed to send stat";
+	       			}
+	    		};
+    			xhttp.open("POST", influxURL, true);
+    			if (net < 0) {
+					xhttp.send('session_load,page=' + name + ',abandoned=1 total=' + abandonedTime);
+    			} else if (dom < 0) {
+					xhttp.send('session_load,page=' + name + ',abandoned=1 total=' + abandonedTime + ',net=' + net);
+    			} else if (load < 0) {
+					xhttp.send('session_load,page=' + name + ',abandoned=1 total=' + abandonedTime + ',net=' + net + ',dom=' + dom);
+    			}
+    			//if load is finished it doesn't look like an abandoned session
+	    		
+    		}
+
+    		var getRandomPageType = function() {
+    			var rand = Math.random();
+    			if (rand < 0.5) {
+    				return PAGE_TYPES['main'];
+    			} else if (rand < 0.65 ) {
+    				return PAGE_TYPES['catalog'];
+    			} else if (rand < 0.75 ) {
+					return PAGE_TYPES['product'];
+				} else if (rand < 0.90 ) {
+					return PAGE_TYPES['search'];
+				} else if (rand < 0.93 ) {
+					return PAGE_TYPES['reg'];
+				} else if (rand < 0.97 ) {
+					return PAGE_TYPES['auth'];
+    			} else {
+    				return PAGE_TYPES[pageTypes[Math.floor(Math.random() * (totalTypes + 1)) + 0]];
+    			}
+    		}
+
+		    window.addEventListener("load", function(event) {
+		    	setInterval(function() {
+		    		for (var i = 5; i >= 0; i--) {
+							var pageType = getRandomPageType();
+							postSessionLoad(pageType.getName(), pageType.getRandomNet(), pageType.getRandomDom(), pageType.getRandomLoad());
+			    		}
+		   		}, 200);
+
+		   		setInterval(function() {
+		   			var pageType = getRandomPageType();
+		    		postAbandoned(pageType.getName(), getRandomInt(8000,10000), Math.random() < 0.5 ? pageType.getRandomNet() : -1, Math.random() < 0.5 ? pageType.getRandomDom() : -1, Math.random() < 0.5 ? pageType.getRandomLoad() : -1);
+		   		}, 250);
+		  	});
+
+		    window.addEventListener("beforeunload", function(event) {
+		    	var pageType = getRandomPageType();
+		    	postAbandoned(pageType.getName(), getRandomInt(8000,10000), Math.random() < 0.5 ? pageType.getRandomNet() : -1, Math.random() < 0.5 ? pageType.getRandomDom() : -1, Math.random() < 0.5 ? pageType.getRandomLoad() : -1);
+		    });
+
+	})();
+
+
+    
+
+   </script>
+</BODY>
+</HTML>

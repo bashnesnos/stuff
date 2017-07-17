@@ -1,0 +1,81 @@
+<!DOCTYPE html PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<HTML>
+   <HEAD>
+      <TITLE>
+         Load simulator
+      </TITLE>
+   </HEAD>
+<BODY>
+   <H1>Hi</H1>
+   <P>This is a proper integration for perf metrics</P> 
+
+   <script type="text/javascript">
+
+    //$.post("http://localhost:8086/query", "q=CREATE DATABASE mydb");
+    
+    function getNetTime() {
+	return performance.timing.domLoading - performance.timing.navigationStart;
+}
+
+function getDomTime() {
+	return performance.timing.domComplete - performance.timing.domLoading;
+}
+
+function getLoadTime() {
+	return performance.timing.loadEventEnd - performance.timing.domComplete;
+}
+
+(function(pageType) {
+		var influxURL = "http://cartarget.ru/ux/stats";
+
+		var postSessionLoad = function(name, net, dom, load) {
+			var xhttp = new XMLHttpRequest();
+    		xhttp.onreadystatechange = function() {
+        		if (this.readyState == 4 && this.status >= 400) {
+            		throw "Failed to send stat";
+       			}
+    		};
+			xhttp.open("POST", influxURL, true);
+    		xhttp.send('session_load,page=' + name + ',abandoned=0 total=' + (net + dom + load) + ',net=' + net + ',dom=' + dom +',load=' + load);
+		}
+
+		var postAbandoned = function(name, abandonedTime, net, dom, load) {
+			var xhttp = new XMLHttpRequest();
+    		xhttp.onreadystatechange = function() {
+        		if (this.readyState == 4 && this.status >= 400) {
+            		throw "Failed to send stat";
+       			}
+    		};
+			xhttp.open("POST", influxURL, true);
+			if (net < 0) {
+				xhttp.send('session_load,page=' + name + ',abandoned=1 total=' + abandonedTime);
+			} else if (dom < 0) {
+				xhttp.send('session_load,page=' + name + ',abandoned=1 total=' + abandonedTime + ',net=' + net);
+			} else if (load < 0) {
+				xhttp.send('session_load,page=' + name + ',abandoned=1 total=' + abandonedTime + ',net=' + net + ',dom=' + dom);
+			}
+			//if load is finished it doesn't look like an abandoned session
+    		
+		}
+
+	    window.addEventListener("load", function(event) {
+	    	setTimeout(function() {
+				postSessionLoad(pageType, getNetTime(), getDomTime(), getLoadTime());
+	   		}, 50);
+  		});
+
+	    window.addEventListener("beforeunload", function(event) {
+	    	var loadTime = getLoadTime();
+	    	if (loadTime < 0) {
+	    		postAbandoned(pageType, performance.now(), getNetTime(), getDomTime(), loadTime);
+	    	}
+	    });
+
+})("index");
+
+
+    
+
+   </script>
+</BODY>
+</HTML>
